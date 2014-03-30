@@ -7,6 +7,21 @@ Faye::WebSocket.load_adapter('thin')
 
 $clients = {}
 
+def symbolize_keys(hash)
+  hash.inject({}){|result, (key, value)|
+    new_key = case key
+              when String then key.to_sym
+              else key
+              end
+    new_value = case value
+                when Hash then symbolize_keys(value)
+                else value
+                end
+    result[new_key] = new_value
+    result
+  }
+end
+
 App = lambda do |env|
   if Faye::WebSocket.websocket?(env)
     ws = Faye::WebSocket.new(env, nil, {ping: 10000})
@@ -14,32 +29,18 @@ App = lambda do |env|
     ws.on :open do |event|
       p 'new client', ws.object_id
       $clients[ws.object_id] = ws
-      ws.send({who: 'onopen', message: ws.object_id}.to_json)
+      ws.send({type: 'onopen', payload: ws.object_id}.to_json)
     end
 
     ws.on :message do |event|
-      data = JSON.parse(event.data)
-      data = data.inject({}){|memo,(k,v)| memo[k.to_sym] = v; memo}
+      data = symbolize_keys(JSON.parse(event.data))
 
       p 'message from client', data
-      if data[:dest_id] == 'setup'
-        $clients[data[:message][1]] = $clients[data[:message][0]]
-        $clients.delete(data[:message][0])
+      if data[:type] == 'setup'
+        $clients[data[:payload][1]] = $clients[data[:payload][0]]
+        $clients[data[:payload][0]] = nil
       else
-        p 'non setup'
-        unless (defined? data[:dest_id]).nil?
-          p 'Unicast'
-          $clients[data[:dest_id]].send({
-            who: data[:src_id],
-            message: data[:message]
-          }.to_json)
-        else
-          p 'Broadcast'
-          $clients.each {|id, client| client.send({
-            who: data[:src_id],
-            message: data[:message]
-          }.to_json)}
-        end
+        $clients[data[:dest_id]].send(data.to_json) if $clients[data[:dest_id]]
       end
     end
 
