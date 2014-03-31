@@ -1,1 +1,1 @@
-web: bundle exec rackup config.ru -p $PORT -E production
+web: bundle exec puma config.ru -p $PORT
