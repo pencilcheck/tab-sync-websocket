@@ -27,12 +27,14 @@ App = lambda do |env|
     ws = Faye::WebSocket.new(env, nil, {ping: 10000})
 
     ws.on :open do |event|
+      p "open connection #{ws.object_id}"
       $clients[ws.object_id] = ws
       ws.send({type: 'onopen', payload: ws.object_id}.to_json)
     end
 
     ws.on :message do |event|
       data = symbolize_keys(JSON.parse(event.data))
+      p "on message #{data}"
 
       if data[:type] == 'setup'
         $clients[data[:payload][1]] = $clients[data[:payload][0]]
@@ -47,6 +49,7 @@ App = lambda do |env|
     end
 
     ws.on :close do |event|
+      p "close connection #{ws.object_id}"
       $clients.delete(ws)
       ws.send('Bye Bye')
       ws = nil
