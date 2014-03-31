@@ -3,7 +3,6 @@
 require 'faye/websocket'
 require 'json'
 $stdout.sync = true
-Faye::WebSocket.load_adapter('thin')
 
 $clients = {}
 
